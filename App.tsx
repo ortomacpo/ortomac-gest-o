@@ -15,7 +15,7 @@ const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   
-  // Se estivermos na nuvem, começamos com array vazio para não misturar dados
+  // ESTADO CRÍTICO: Se a nuvem está ativa, ignoramos os dados de teste (MOCK) completamente
   const [patients, setPatients] = useState<Patient[]>(isFirebaseConfigured ? [] : INITIAL_PATIENTS);
   const [appointments, setAppointments] = useState<Appointment[]>(isFirebaseConfigured ? [] : INITIAL_APPOINTMENTS);
   const [transactions, setTransactions] = useState<Transaction[]>(isFirebaseConfigured ? [] : INITIAL_FINANCE);
@@ -23,14 +23,13 @@ const App: React.FC = () => {
   const [workshopOrders, setWorkshopOrders] = useState<WorkshopOrder[]>(isFirebaseConfigured ? [] : INITIAL_WORKSHOP);
   
   const [loading, setLoading] = useState(true);
-  const [isSyncing, setIsSyncing] = useState(false);
 
   useEffect(() => {
     const savedUser = localStorage.getItem('ortomac_user');
     if (savedUser) setCurrentUser(JSON.parse(savedUser));
 
     if (isFirebaseConfigured) {
-      setIsSyncing(true);
+      console.log("Iniciando escuta em tempo real...");
       
       const unsubs = [
         subscribeToCollection('patients', (data) => setPatients(data as Patient[])),
@@ -41,9 +40,6 @@ const App: React.FC = () => {
       ];
 
       setLoading(false);
-      // Simula fim do carregamento inicial após 1s para garantir que os snaps chegaram
-      setTimeout(() => setIsSyncing(false), 1500);
-
       return () => unsubs.forEach(unsub => unsub());
     } else {
       setLoading(false);
@@ -64,8 +60,8 @@ const App: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center bg-blue-900 text-white font-bold">
-        Sincronizando Banco de Dados...
+      <div className="h-screen w-screen flex items-center justify-center bg-blue-900 text-white font-bold animate-pulse">
+        CARREGANDO DADOS DA NUVEM...
       </div>
     );
   }
@@ -98,14 +94,9 @@ const App: React.FC = () => {
       setActiveTab={setActiveTab}
     >
       <div className="relative">
-        {isSyncing && (
-          <div className="fixed top-20 right-4 z-50 bg-blue-600 text-white text-[10px] px-3 py-1 rounded-full animate-pulse shadow-lg font-bold uppercase tracking-widest">
-            Sincronizando Nuvem...
-          </div>
-        )}
         {!isFirebaseConfigured && (
-          <div className="mb-4 p-2 bg-red-100 text-red-800 text-[10px] font-bold uppercase text-center rounded-lg border border-red-200">
-            🚨 ATENÇÃO: ERRO DE CONFIGURAÇÃO DE NUVEM. Verifique as chaves no painel da Vercel.
+          <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] bg-red-600 text-white px-6 py-2 rounded-full shadow-2xl font-black text-xs uppercase animate-bounce">
+            🚨 MODO OFFLINE: Seus dados NÃO estão sendo salvos!
           </div>
         )}
         {renderContent()}
