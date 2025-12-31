@@ -1,7 +1,7 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
 import { getFirestore, collection, onSnapshot, addDoc, updateDoc, doc, Firestore, getDocs, limit, query } from "firebase/firestore";
 
-// Mapeamento das variáveis vindas da Vercel através do Vite
+// No Vite/Vercel, as variáveis definidas no vite.config.ts chegam via process.env
 const firebaseConfig = {
   apiKey: process.env.FIREBASE_API_KEY,
   authDomain: process.env.FIREBASE_AUTH_DOMAIN,
@@ -11,23 +11,17 @@ const firebaseConfig = {
   appId: process.env.ID_DO_APLICATIVO_FIREBASE
 };
 
-// RELATÓRIO DE CONEXÃO DETALHADO
-console.group("🔍 Diagnóstico Ortomac Connection");
-console.log("Projeto ID:", firebaseConfig.projectId || "❌ AUSENTE");
-console.log("Configuração Completa:", !!(firebaseConfig.apiKey && firebaseConfig.projectId) ? "✅ OK" : "❌ INCOMPLETA");
-console.groupEnd();
-
 export const isFirebaseConfigured = !!(
   firebaseConfig.apiKey && 
   firebaseConfig.projectId && 
-  firebaseConfig.apiKey.length > 10
+  firebaseConfig.projectId !== "undefined"
 );
 
 export const getEnvStatus = () => ({
-  apiKey: !!firebaseConfig.apiKey,
-  projectId: !!firebaseConfig.projectId,
-  appId: !!firebaseConfig.appId,
-  geminiKey: !!process.env.API_KEY
+  apiKey: !!firebaseConfig.apiKey && firebaseConfig.apiKey !== "undefined",
+  projectId: !!firebaseConfig.projectId && firebaseConfig.projectId !== "undefined",
+  appId: !!firebaseConfig.appId && firebaseConfig.appId !== "undefined",
+  geminiKey: !!process.env.API_KEY && process.env.API_KEY !== "undefined"
 });
 
 let app: FirebaseApp | null = null;
@@ -37,15 +31,14 @@ if (isFirebaseConfigured) {
   try {
     app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
     db = getFirestore(app);
-    console.log("🚀 Firebase inicializado com sucesso.");
+    console.log("🚀 Firebase Ortomac conectado.");
   } catch (err) {
-    console.error("🔥 Erro ao inicializar Firebase:", err);
+    console.error("🔥 Erro Firebase:", err);
   }
 }
 
 export { db };
 
-// Função para testar se as regras do Firestore estão realmente funcionando
 export const testFirestoreConnection = async () => {
   if (!db) return false;
   try {
@@ -53,7 +46,7 @@ export const testFirestoreConnection = async () => {
     await getDocs(q);
     return true;
   } catch (e) {
-    console.error("❌ Erro de Permissão/Conexão no Firestore:", e);
+    console.error("❌ Erro Firestore:", e);
     return false;
   }
 };
@@ -66,7 +59,7 @@ export const subscribeToCollection = (collectionName: string, callback: (data: a
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       callback(data);
     }, (err) => {
-      console.error(`❌ Erro na coleção ${collectionName}:`, err.message);
+      console.error(`❌ Erro ${collectionName}:`, err.message);
     });
   } catch (e) {
     return () => {};

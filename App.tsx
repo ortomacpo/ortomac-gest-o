@@ -28,8 +28,9 @@ const App: React.FC = () => {
     if (savedUser) setCurrentUser(JSON.parse(savedUser));
 
     const initData = async () => {
-      if (isFirebaseConfigured && db) {
-        // Testa a conexão real com o banco
+      const configured = isFirebaseConfigured;
+      
+      if (configured && db) {
         const healthy = await testFirestoreConnection();
         setFirestoreHealthy(healthy);
 
@@ -41,9 +42,10 @@ const App: React.FC = () => {
           subscribeToCollection('workshopOrders', (data) => setWorkshopOrders(data as WorkshopOrder[]))
         ];
         
-        setTimeout(() => setLoading(false), 1000);
+        setLoading(false);
         return () => unsubs.forEach(unsub => unsub());
       } else {
+        // Fallback para dados locais se o Firebase não estiver configurado
         setPatients(INITIAL_PATIENTS);
         setAppointments(INITIAL_APPOINTMENTS);
         setTransactions(INITIAL_FINANCE);
@@ -73,12 +75,13 @@ const App: React.FC = () => {
       <div className="h-screen w-screen flex flex-col items-center justify-center bg-blue-900 text-white">
         <div className="w-16 h-16 border-4 border-white/20 border-t-white rounded-full animate-spin mb-4"></div>
         <h2 className="text-xl font-bold animate-pulse tracking-widest">ORTOMAC</h2>
-        <p className="text-xs text-blue-300 mt-2">Sincronizando Nuvem Ortomac-1...</p>
+        <p className="text-xs text-blue-300 mt-2">Sincronizando Nuvem...</p>
       </div>
     );
   }
 
   const env = getEnvStatus();
+  const firebaseWorking = isFirebaseConfigured && firestoreHealthy;
 
   return (
     <Layout
@@ -89,28 +92,25 @@ const App: React.FC = () => {
       setActiveTab={setActiveTab}
     >
       <div className="relative">
-        {(!isFirebaseConfigured || showDiagnostic) && (
-          <div className={`mb-6 p-5 rounded-3xl flex items-center justify-between border-2 ${!isFirebaseConfigured || firestoreHealthy === false ? 'bg-red-50 border-red-200' : 'bg-blue-50 border-blue-200'}`}>
-            <div className="flex items-center space-x-4">
-              <span className="text-3xl">{!isFirebaseConfigured ? '⚠️' : firestoreHealthy ? '✅' : '❌'}</span>
+        {(!firebaseWorking || showDiagnostic) && (
+          <div className={`mb-6 p-4 rounded-2xl flex items-center justify-between border ${!firebaseWorking ? 'bg-amber-50 border-amber-200' : 'bg-blue-50 border-blue-200'}`}>
+            <div className="flex items-center space-x-3">
+              <span className="text-xl">{!firebaseWorking ? '⚠️' : '✅'}</span>
               <div>
-                <p className={`font-black text-sm uppercase ${!isFirebaseConfigured ? 'text-red-800' : 'text-blue-800'}`}>
-                  {!isFirebaseConfigured ? 'Firebase: Não Configurado' : `Firestore: ${firestoreHealthy ? 'Conectado' : 'Erro de Permissão'}`}
+                <p className="font-bold text-xs uppercase text-gray-800">
+                  Status da Conexão Nuvem
                 </p>
-                <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1">
-                  <span className={`text-[10px] font-bold ${env.projectId ? 'text-green-600' : 'text-red-400'}`}>ID PROJETO: {env.projectId ? 'OK' : 'FALTA'}</span>
-                  <span className={`text-[10px] font-bold ${firestoreHealthy ? 'text-green-600' : 'text-red-400'}`}>BANCO DADOS: {firestoreHealthy ? 'ATIVO' : 'BLOQUEADO'}</span>
-                  <span className={`text-[10px] font-bold ${env.geminiKey ? 'text-green-600' : 'text-red-400'}`}>IA GEMINI: {env.geminiKey ? 'ATIVO' : 'FALTA'}</span>
+                <div className="flex gap-3 mt-1">
+                  <span className={`text-[9px] font-bold ${env.apiKey ? 'text-green-600' : 'text-red-500'}`}>API: {env.apiKey ? 'OK' : 'FALTA'}</span>
+                  <span className={`text-[9px] font-bold ${env.projectId ? 'text-green-600' : 'text-red-500'}`}>PROJETO: {env.projectId ? 'OK' : 'FALTA'}</span>
+                  <span className={`text-[9px] font-bold ${firestoreHealthy ? 'text-green-600' : 'text-red-500'}`}>BANCO: {firestoreHealthy ? 'OK' : 'ERRO'}</span>
                 </div>
               </div>
             </div>
-            {!isFirebaseConfigured && (
-              <button 
-                onClick={() => window.open('https://vercel.com', '_blank')}
-                className="bg-red-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-red-700 transition-all shadow-lg shadow-red-100"
-              >
-                Abrir Vercel
-              </button>
+            {!firebaseWorking && (
+              <p className="text-[10px] text-amber-800 max-w-[200px] leading-tight">
+                Verifique as Environment Variables na Vercel e faça o Redeploy.
+              </p>
             )}
           </div>
         )}
@@ -118,8 +118,7 @@ const App: React.FC = () => {
         {currentUser.role === 'GESTOR' && (
           <button 
             onClick={() => setShowDiagnostic(!showDiagnostic)}
-            className="fixed bottom-20 right-6 w-12 h-12 bg-white shadow-2xl rounded-full flex items-center justify-center border border-gray-100 z-[100] hover:scale-110 active:scale-90 transition-all"
-            title="Diagnóstico de Sistema"
+            className="fixed bottom-20 right-6 w-10 h-10 bg-white shadow-xl rounded-full flex items-center justify-center border border-gray-100 z-50 hover:scale-110 transition-transform"
           >
             ⚙️
           </button>
