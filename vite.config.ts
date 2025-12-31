@@ -4,14 +4,11 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   define: {
-    // Isso garante que o código entenda process.env mesmo rodando no navegador via Vite
+    // Isso garante que o código consiga ler process.env.CHAVE_TAL
     'process.env': process.env
-  },
-  server: {
-    port: 3000
   },
   build: {
     outDir: 'dist',
-    sourcemap: false
+    chunkSizeWarningLimit: 1600,
   }
 });
