@@ -1,17 +1,35 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
 import { getFirestore, collection, onSnapshot, addDoc, updateDoc, doc, query, Firestore } from "firebase/firestore";
 
-// Tenta obter as variáveis de todas as formas que o Vite e a Vercel permitem
-const firebaseConfig = {
-  apiKey: (import.meta as any).env.VITE_FIREBASE_API_KEY || (import.meta as any).env.FIREBASE_API_KEY || "",
-  authDomain: (import.meta as any).env.VITE_FIREBASE_AUTH_DOMAIN || (import.meta as any).env.FIREBASE_AUTH_DOMAIN || "",
-  projectId: (import.meta as any).env.VITE_FIREBASE_PROJECT_ID || (import.meta as any).env.FIREBASE_PROJECT_ID || "",
-  storageBucket: (import.meta as any).env.VITE_FIREBASE_STORAGE_BUCKET || (import.meta as any).env.FIREBASE_STORAGE_BUCKET || "",
-  messagingSenderId: (import.meta as any).env.VITE_FIREBASE_MESSAGING_SENDER_ID || (import.meta as any).env.FIREBASE_MESSAGING_SENDER_ID || "",
-  appId: (import.meta as any).env.VITE_FIREBASE_APP_ID || (import.meta as any).env.FIREBASE_APP_ID || ""
+// Função para tentar capturar a chave de qualquer lugar (Vite, Process ou Window)
+const getSafeEnv = (key: string): string => {
+  const viteKey = `VITE_FIREBASE_${key}`;
+  const rawKey = `FIREBASE_${key}`;
+  
+  return (
+    (import.meta as any).env?.[viteKey] || 
+    (import.meta as any).env?.[rawKey] || 
+    (window as any).process?.env?.[viteKey] ||
+    (window as any).process?.env?.[rawKey] ||
+    ""
+  ).trim();
 };
 
-// Verifica se a API Key existe de fato e não é apenas um texto vazio ou "undefined"
+const firebaseConfig = {
+  apiKey: getSafeEnv('API_KEY'),
+  authDomain: getSafeEnv('AUTH_DOMAIN'),
+  projectId: getSafeEnv('PROJECT_ID'),
+  storageBucket: getSafeEnv('STORAGE_BUCKET'),
+  messagingSenderId: getSafeEnv('MESSAGING_SENDER_ID'),
+  appId: getSafeEnv('APP_ID')
+};
+
+// Debug para o desenvolvedor (visível no F12)
+console.log("🔍 Verificando Configuração Firebase...");
+if (!firebaseConfig.apiKey) {
+  console.warn("⚠️ API_KEY não encontrada. Verifique as variáveis de ambiente na Vercel.");
+}
+
 export const isFirebaseConfigured = 
   !!firebaseConfig.apiKey && 
   firebaseConfig.apiKey.length > 10 && 
@@ -24,9 +42,9 @@ if (isFirebaseConfigured) {
   try {
     app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
     db = getFirestore(app);
-    console.log("🔥 Firebase conectado com sucesso!");
+    console.log("✅ ORTOMAC CLOUD: Conectado.");
   } catch (err) {
-    console.error("Erro ao inicializar Firebase:", err);
+    console.error("❌ Erro ao conectar Firebase:", err);
   }
 }
 
@@ -34,38 +52,26 @@ export { db };
 
 export const subscribeToCollection = (collectionName: string, callback: (data: any[]) => void) => {
   if (!db) return () => {};
-  
-  const q = query(collection(db, collectionName));
-  
+  const q = collection(db, collectionName);
   return onSnapshot(q, (snapshot) => {
-    const data = snapshot.docs.map(doc => ({ 
-      id: doc.id, 
-      ...doc.data() 
-    }));
-    // Ordenação simples no cliente (mais recentes primeiro)
-    const sorted = data.sort((a: any, b: any) => 
-      new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
-    );
-    callback(sorted);
-  }, (error) => {
-    console.error(`Erro na coleção ${collectionName}:`, error);
-  });
+    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    callback(data.sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()));
+  }, (err) => console.error(`Erro em ${collectionName}:`, err));
 };
 
 export const addToCloud = async (collectionName: string, data: any) => {
   if (!db) {
-    alert("Atenção: Sistema em Modo Offline. Verifique as chaves na Vercel.");
+    alert("Erro: Banco de dados não inicializado.");
     return;
   }
   try {
-    const docRef = await addDoc(collection(db, collectionName), {
+    return await addDoc(collection(db, collectionName), {
       ...data,
       createdAt: new Date().toISOString()
     });
-    return docRef;
   } catch (e) {
-    console.error("Erro ao salvar:", e);
-    alert("Falha ao salvar na nuvem. Verifique sua conexão.");
+    console.error("Erro addDoc:", e);
+    alert("Falha ao salvar. Verifique sua conexão ou permissões.");
     throw e;
   }
 };
@@ -73,12 +79,9 @@ export const addToCloud = async (collectionName: string, data: any) => {
 export const updateInCloud = async (collectionName: string, id: string, data: any) => {
   if (!db) return;
   try {
-    await updateDoc(doc(db, collectionName, id), {
-      ...data,
-      updatedAt: new Date().toISOString()
-    });
+    await updateDoc(doc(db, collectionName, id), { ...data, updatedAt: new Date().toISOString() });
   } catch (e) {
-    console.error("Erro ao atualizar:", e);
+    console.error("Erro updateDoc:", e);
     throw e;
   }
 };
