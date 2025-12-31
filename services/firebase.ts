@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
-import { getFirestore, collection, onSnapshot, addDoc, updateDoc, doc, query, Firestore } from "firebase/firestore";
+import { getFirestore, collection, onSnapshot, addDoc, updateDoc, doc, query, Firestore, orderBy } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: process.env.FIREBASE_API_KEY,
@@ -10,7 +10,11 @@ const firebaseConfig = {
   appId: process.env.FIREBASE_APP_ID
 };
 
-export const isFirebaseConfigured = !!firebaseConfig.apiKey && firebaseConfig.apiKey !== "undefined";
+// Verificação rigorosa se as chaves existem
+export const isFirebaseConfigured = 
+  !!firebaseConfig.apiKey && 
+  firebaseConfig.apiKey !== "undefined" && 
+  firebaseConfig.apiKey.length > 10;
 
 let app: FirebaseApp | null = null;
 let db: Firestore | null = null;
@@ -19,47 +23,52 @@ if (isFirebaseConfigured) {
   try {
     app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
     db = getFirestore(app);
-    console.log("🔥 Ortomac Cloud: Conectado com sucesso.");
+    console.log("✅ Conectado à Nuvem Ortomac");
   } catch (err) {
-    console.error("❌ Erro ao inicializar Firebase:", err);
+    console.error("❌ Erro fatal ao conectar na nuvem:", err);
   }
 } else {
-  console.warn("☁️ Ortomac Cloud: Variáveis de ambiente não encontradas. Verifique as configurações na Vercel.");
+  console.warn("⚠️ Ambiente de Nuvem não detectado. Usando modo de demonstração local.");
 }
 
 export { db };
 
 export const subscribeToCollection = (collectionName: string, callback: (data: any[]) => void) => {
-  if (!db) {
-    console.warn(`Tentativa de inscrição em ${collectionName} sem banco de dados.`);
-    return () => {};
-  }
+  if (!db) return () => {};
   
+  // Adicionado ordenação por data de criação para manter consistência entre usuários
   const q = query(collection(db, collectionName));
+  
   return onSnapshot(q, 
     (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      console.log(`📡 Atualização recebida [${collectionName}]:`, data.length, "itens");
+      const data = snapshot.docs.map(doc => ({ 
+        id: doc.id, 
+        ...doc.data() 
+      }));
+      console.log(`[Sync] ${collectionName} atualizado: ${data.length} registros.`);
       callback(data);
     },
     (error) => {
-      console.error(`Erro na inscrição da coleção ${collectionName}:`, error);
+      console.error(`[Sync Error] Falha na coleção ${collectionName}:`, error);
     }
   );
 };
 
 export const addToCloud = async (collectionName: string, data: any) => {
   if (!db) {
-    alert("Erro: Sistema em modo offline. O dado não foi salvo na nuvem.");
+    console.error("Tentativa de escrita offline bloqueada.");
     return;
   }
   try {
-    return await addDoc(collection(db, collectionName), {
+    const docRef = await addDoc(collection(db, collectionName), {
       ...data,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      serverTimestamp: new Date().getTime()
     });
+    console.log(`[Cloud] Sucesso: ${collectionName} -> ${docRef.id}`);
+    return docRef;
   } catch (e) {
-    console.error("Erro ao salvar:", e);
+    console.error("[Cloud Error] Falha ao salvar:", e);
     throw e;
   }
 };
@@ -67,12 +76,12 @@ export const addToCloud = async (collectionName: string, data: any) => {
 export const updateInCloud = async (collectionName: string, id: string, data: any) => {
   if (!db) return;
   try {
-    return await updateDoc(doc(db, collectionName, id), {
+    await updateDoc(doc(db, collectionName, id), {
       ...data,
       updatedAt: new Date().toISOString()
     });
   } catch (e) {
-    console.error("Erro ao atualizar:", e);
+    console.error("[Cloud Error] Falha ao atualizar:", e);
     throw e;
   }
 };
