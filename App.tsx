@@ -26,17 +26,13 @@ const App: React.FC = () => {
 
   const initData = useCallback(async () => {
     setLoading(true);
-    setFirestoreHealthy(null);
-    
     const configured = isFirebaseConfigured;
-    console.log("App: Iniciando conexão... Configurado:", configured);
 
     if (configured && db) {
       const healthy = await testFirestoreConnection();
       setFirestoreHealthy(healthy);
 
       if (healthy) {
-        console.log("App: Conexão Nuvem OK. Inscrevendo em coleções.");
         const unsubs = [
           subscribeToCollection('patients', (data) => setPatients(data as Patient[])),
           subscribeToCollection('appointments', (data) => setAppointments(data as Appointment[])),
@@ -49,7 +45,6 @@ const App: React.FC = () => {
       }
     }
     
-    console.warn("App: Falha na conexão Nuvem ou não configurado. Usando dados locais.");
     setFirestoreHealthy(false);
     setPatients(INITIAL_PATIENTS);
     setAppointments(INITIAL_APPOINTMENTS);
@@ -66,7 +61,7 @@ const App: React.FC = () => {
   }, [initData]);
 
   const handleSeed = async () => {
-    if (!confirm("Isso vai enviar os dados de demonstração para sua Nuvem. Continuar?")) return;
+    if (!confirm("Isso enviará os dados iniciais para seu banco na nuvem. Continuar?")) return;
     setSyncLoading(true);
     const result = await seedDatabase({
       patients: INITIAL_PATIENTS,
@@ -77,10 +72,7 @@ const App: React.FC = () => {
     });
     alert(result.message);
     setSyncLoading(false);
-    if (result.success) {
-      // Pequeno delay para o Firestore propagar
-      setTimeout(() => window.location.reload(), 1500);
-    }
+    if (result.success) window.location.reload();
   };
 
   const handleLogin = (user: User) => {
@@ -93,22 +85,13 @@ const App: React.FC = () => {
     localStorage.removeItem('ortomac_user');
   };
 
-  async function adjustInventoryInCloud(id: string, data: any) {
-    if (isFirebaseConfigured && firestoreHealthy) {
-      await updateInCloud('inventory', id, data);
-    } else {
-      setInventory(prev => prev.map(item => item.id === id ? { ...item, ...data } : item));
-    }
-  }
-
   if (!currentUser) return <Login onLogin={handleLogin} />;
 
   if (loading) {
     return (
-      <div className="h-screen w-screen flex flex-col items-center justify-center bg-blue-900 text-white">
-        <div className="w-16 h-16 border-4 border-white/20 border-t-white rounded-full animate-spin mb-4"></div>
-        <h2 className="text-xl font-bold animate-pulse tracking-widest">ORTOMAC</h2>
-        <p className="text-[10px] text-blue-300 mt-2 text-center px-6 uppercase tracking-tighter">Sincronizando com a Nuvem...</p>
+      <div className="h-screen w-screen flex flex-col items-center justify-center bg-blue-900 text-white p-6">
+        <div className="w-12 h-12 border-4 border-white/20 border-t-white rounded-full animate-spin mb-4"></div>
+        <p className="text-xs font-bold uppercase tracking-widest animate-pulse">Iniciando Ortomac...</p>
       </div>
     );
   }
@@ -125,56 +108,61 @@ const App: React.FC = () => {
       setActiveTab={setActiveTab}
       isSynced={firestoreHealthy}
     >
-      <div className="relative">
+      <div className="max-w-7xl mx-auto">
         {showDiagnostic && (
-          <div className="mb-6 p-6 rounded-3xl bg-white border border-blue-100 shadow-xl animate-in slide-in-from-top duration-500">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-              <div className="flex items-center space-x-4">
-                <div className={`w-4 h-4 rounded-full ${firebaseWorking ? 'bg-green-500 shadow-[0_0_15px_rgba(34,197,94,0.6)] animate-pulse' : 'bg-red-500'}`}></div>
-                <div>
-                  <h4 className="font-black text-gray-900 text-base uppercase">Diagnóstico de Infraestrutura</h4>
-                  <p className="text-[11px] text-gray-500">Conectado ao Projeto: <span className="font-bold text-blue-600 underline">{env.projectId || 'Nenhum (Modo Local)'}</span></p>
-                </div>
+          <div className="mb-8 p-8 bg-white rounded-3xl border-2 border-blue-100 shadow-2xl animate-in slide-in-from-top duration-500">
+            <div className="flex justify-between items-start mb-6">
+              <div>
+                <h3 className="text-xl font-black text-blue-900 uppercase">Painel de Infraestrutura</h3>
+                <p className="text-sm text-gray-500">Verifique se as variáveis abaixo estão verdes na Vercel.</p>
               </div>
-              
-              <div className="flex flex-wrap gap-3">
-                <button 
-                  onClick={() => initData()}
-                  className="bg-gray-100 hover:bg-gray-200 text-gray-700 text-[10px] font-black px-4 py-2 rounded-xl transition-all"
-                >
-                  🔄 TENTAR RECONECTAR
-                </button>
-                {isFirebaseConfigured && (
-                  <button 
-                    onClick={handleSeed}
-                    disabled={syncLoading}
-                    className="bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-black px-4 py-2 rounded-xl transition-all disabled:opacity-50 shadow-lg shadow-blue-100"
-                  >
-                    {syncLoading ? 'ENVIANDO...' : '🚀 ENVIAR DADOS DEMO PARA NUVEM'}
-                  </button>
-                )}
-              </div>
+              <button onClick={() => setShowDiagnostic(false)} className="text-gray-400 hover:text-gray-600 text-2xl">✕</button>
             </div>
 
-            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className={`p-4 rounded-2xl border ${env.apiKey ? 'bg-green-50 border-green-100' : 'bg-red-50 border-red-100'}`}>
-                <p className="text-[10px] font-bold uppercase text-gray-400 mb-1">Status da API KEY</p>
-                <p className={`text-xs font-black ${env.apiKey ? 'text-green-700' : 'text-red-700'}`}>{env.apiKey ? '✅ CONFIGURADA NA VERCEL' : '❌ AUSENTE OU INVÁLIDA'}</p>
-              </div>
-              <div className={`p-4 rounded-2xl border ${firestoreHealthy ? 'bg-green-50 border-green-100' : 'bg-red-50 border-red-100'}`}>
-                <p className="text-[10px] font-bold uppercase text-gray-400 mb-1">Status do Banco (Firestore)</p>
-                <p className={`text-xs font-black ${firestoreHealthy ? 'text-green-700' : 'text-red-700'}`}>{firestoreHealthy ? '✅ COMUNICAÇÃO ATIVA' : '❌ ERRO DE COMUNICAÇÃO'}</p>
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+              {[
+                { label: 'API Key', status: env.apiKey, name: 'FIREBASE_API_KEY' },
+                { label: 'Projeto ID', status: !!env.projectId, name: 'ID_DO_PROJETO_FIREBASE' },
+                { label: 'Auth Domain', status: env.authDomain, name: 'FIREBASE_AUTH_DOMAIN' },
+                { label: 'Storage', status: env.storageBucket, name: 'FIREBASE_STORAGE_BUCKET' },
+                { label: 'Messaging', status: env.messagingId, name: 'ID_DO_REMETENTE_DE_MENSAGENS_DO_FIREBASE' },
+                { label: 'App ID', status: env.appId, name: 'ID_DO_APLICATIVO_FIREBASE' },
+                { label: 'IA (Gemini)', status: env.geminiKey, name: 'API_KEY' },
+              ].map(item => (
+                <div key={item.name} className={`p-4 rounded-2xl border ${item.status ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">{item.label}</span>
+                    <span className={`text-[10px] font-black ${item.status ? 'text-green-600' : 'text-red-600'}`}>{item.status ? 'OK' : 'FALTANDO'}</span>
+                  </div>
+                  <code className="text-[11px] font-mono font-bold text-gray-700">{item.name}</code>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex flex-col md:flex-row gap-4">
+              <button 
+                onClick={() => window.location.reload()}
+                className="flex-1 bg-blue-900 text-white py-4 rounded-2xl font-bold hover:bg-blue-800 transition-all shadow-lg"
+              >
+                🔄 RECARREGAR APP
+              </button>
+              {isFirebaseConfigured && (
+                <button 
+                  onClick={handleSeed}
+                  disabled={syncLoading}
+                  className="flex-1 bg-green-600 text-white py-4 rounded-2xl font-bold hover:bg-green-700 transition-all shadow-lg disabled:opacity-50"
+                >
+                  {syncLoading ? 'ENVIANDO...' : '🚀 ENVIAR DADOS DEMO PARA NUVEM'}
+                </button>
+              )}
             </div>
 
             {!firebaseWorking && (
-              <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-2xl text-[11px] text-amber-900 leading-relaxed shadow-inner">
-                <p className="font-black mb-2 flex items-center"><span className="mr-2">💡</span> GUIA DE RESOLUÇÃO:</p>
-                <ol className="list-decimal ml-5 space-y-2">
-                  <li><strong>Vercel:</strong> Verifique se as variáveis no painel da Vercel estão com os nomes IDÊNTICOS aos do código (ex: <code>ID_DO_PROJETO_FIREBASE</code>).</li>
-                  <li><strong>Redeploy:</strong> Após alterar variáveis na Vercel, você <u>precisa</u> ir em "Deployments" e clicar em "Redeploy".</li>
-                  <li><strong>Regras do Firebase:</strong> No console do Firebase, vá em Firestore {'->'} Rules e garanta que o acesso está permitido (Ex: <code>allow read, write: if true;</code> para testes).</li>
-                </ol>
+              <div className="mt-8 p-6 bg-amber-50 rounded-2xl border border-amber-200">
+                <p className="text-sm text-amber-900 leading-relaxed font-medium">
+                  <strong>💡 Por que ainda aparece Modo Local?</strong><br/>
+                  Se você já configurou as chaves acima na Vercel e elas aparecem como "FALTANDO", você <strong>precisa fazer um novo Deployment</strong>. Vá no painel da Vercel &rarr; Deployments &rarr; Clique nos "..." &rarr; <strong>Redeploy</strong>.
+                </p>
               </div>
             )}
           </div>
@@ -193,7 +181,7 @@ const App: React.FC = () => {
         {activeTab === 'agenda' && <Agenda appointments={appointments} onAddAppointment={(data) => addToCloud('appointments', data)} patients={patients} />}
         {activeTab === 'pacientes' && <Prontuarios patients={patients} onAddPatient={(data) => addToCloud('patients', data)} />}
         {activeTab === 'financeiro' && <Financeiro transactions={transactions} onAddTransaction={(data) => addToCloud('transactions', data)} />}
-        {activeTab === 'estoque' && <Estoque inventory={inventory} onUpdateItem={(id, data) => adjustInventoryInCloud(id, data)} onAddItem={(data) => addToCloud('inventory', data)} />}
+        {activeTab === 'estoque' && <Estoque inventory={inventory} onUpdateItem={(id, data) => updateInCloud('inventory', id, data)} onAddItem={(data) => addToCloud('inventory', data)} />}
         {activeTab === 'oficina' && <Oficina orders={workshopOrders} onUpdateOrder={(id, data) => updateInCloud('workshopOrders', id, data)} onAddOrder={(data) => addToCloud('workshopOrders', data)} patients={patients} />}
       </div>
     </Layout>
