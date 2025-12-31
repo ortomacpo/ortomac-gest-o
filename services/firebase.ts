@@ -1,7 +1,6 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
-import { getFirestore, collection, onSnapshot, addDoc, updateDoc, doc, Firestore, getDocs, limit, query } from "firebase/firestore";
+import { getFirestore, collection, onSnapshot, addDoc, updateDoc, doc, Firestore, getDocs, limit, query, writeBatch } from "firebase/firestore";
 
-// No Vite/Vercel, as variáveis definidas no vite.config.ts chegam via process.env
 const firebaseConfig = {
   apiKey: process.env.FIREBASE_API_KEY,
   authDomain: process.env.FIREBASE_AUTH_DOMAIN,
@@ -19,7 +18,7 @@ export const isFirebaseConfigured = !!(
 
 export const getEnvStatus = () => ({
   apiKey: !!firebaseConfig.apiKey && firebaseConfig.apiKey !== "undefined",
-  projectId: !!firebaseConfig.projectId && firebaseConfig.projectId !== "undefined",
+  projectId: firebaseConfig.projectId === "undefined" ? null : firebaseConfig.projectId,
   appId: !!firebaseConfig.appId && firebaseConfig.appId !== "undefined",
   geminiKey: !!process.env.API_KEY && process.env.API_KEY !== "undefined"
 });
@@ -31,7 +30,6 @@ if (isFirebaseConfigured) {
   try {
     app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
     db = getFirestore(app);
-    console.log("🚀 Firebase Ortomac conectado.");
   } catch (err) {
     console.error("🔥 Erro Firebase:", err);
   }
@@ -46,8 +44,34 @@ export const testFirestoreConnection = async () => {
     await getDocs(q);
     return true;
   } catch (e) {
-    console.error("❌ Erro Firestore:", e);
     return false;
+  }
+};
+
+export const seedDatabase = async (initialData: any) => {
+  if (!db) return { success: false, message: "Firebase não configurado" };
+  try {
+    // Verifica se já existem pacientes para evitar duplicidade acidental
+    const snapshot = await getDocs(query(collection(db, 'patients'), limit(1)));
+    if (!snapshot.empty) return { success: false, message: "O banco já contém dados." };
+
+    const batch = writeBatch(db);
+    
+    // Popular coleções básicas
+    for (const p of initialData.patients) {
+      const ref = doc(collection(db, 'patients'));
+      batch.set(ref, p);
+    }
+    
+    for (const i of initialData.inventory) {
+      const ref = doc(collection(db, 'inventory'));
+      batch.set(ref, i);
+    }
+
+    await batch.commit();
+    return { success: true, message: "Dados sincronizados com sucesso!" };
+  } catch (e: any) {
+    return { success: false, message: e.message };
   }
 };
 

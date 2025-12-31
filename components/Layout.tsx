@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { UserRole } from '../types';
 
@@ -9,9 +8,10 @@ interface LayoutProps {
   onLogout: () => void;
   activeTab: string;
   setActiveTab: (tab: string) => void;
+  isSynced: boolean | null;
 }
 
-const Layout: React.FC<LayoutProps> = ({ children, userRole, userName, onLogout, activeTab, setActiveTab }) => {
+const Layout: React.FC<LayoutProps> = ({ children, userRole, userName, onLogout, activeTab, setActiveTab, isSynced }) => {
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: '📊', roles: ['GESTOR', 'FISIOTERAPEUTA', 'RECEPCIONISTA', 'TECNICO_ORTOPEDICO'] },
     { id: 'agenda', label: 'Agenda', icon: '📅', roles: ['GESTOR', 'FISIOTERAPEUTA', 'RECEPCIONISTA'] },
@@ -76,9 +76,21 @@ const Layout: React.FC<LayoutProps> = ({ children, userRole, userName, onLogout,
             </h2>
           </div>
           <div className="flex items-center space-x-2">
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-              Online
-            </span>
+            {isSynced === null ? (
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black bg-gray-100 text-gray-400">
+                VERIFICANDO...
+              </span>
+            ) : isSynced ? (
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black bg-green-100 text-green-700">
+                <span className="w-1.5 h-1.5 bg-green-500 rounded-full mr-1.5 animate-pulse"></span>
+                NUVEM ATIVA
+              </span>
+            ) : (
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-700">
+                <span className="w-1.5 h-1.5 bg-amber-500 rounded-full mr-1.5"></span>
+                MODO LOCAL (DEMO)
+              </span>
+            )}
           </div>
         </header>
 
