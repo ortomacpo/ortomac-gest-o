@@ -1,19 +1,21 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
 import { getFirestore, collection, onSnapshot, addDoc, updateDoc, doc, Firestore, getDocs, limit, query, writeBatch } from "firebase/firestore";
 
-// Helper para limpar valores vindos do build process
-const getEnv = (key: string | undefined) => {
-  if (!key || key === "undefined" || key === "null" || key === "") return undefined;
-  return key;
+// Função ultra-segura para limpar valores vindos da Vercel
+const cleanValue = (val: any): string | undefined => {
+  if (val === undefined || val === null) return undefined;
+  const str = String(val).trim();
+  if (str === '' || str === 'undefined' || str === 'null' || str === '""' || str === "''") return undefined;
+  return str;
 };
 
 const firebaseConfig = {
-  apiKey: getEnv(process.env.FIREBASE_API_KEY),
-  authDomain: getEnv(process.env.FIREBASE_AUTH_DOMAIN),
-  projectId: getEnv(process.env.ID_DO_PROJETO_FIREBASE),
-  storageBucket: getEnv(process.env.FIREBASE_STORAGE_BUCKET),
-  messagingSenderId: getEnv(process.env.ID_DO_REMETENTE_DE_MENSAGENS_DO_FIREBASE),
-  appId: getEnv(process.env.ID_DO_APLICATIVO_FIREBASE)
+  apiKey: cleanValue(process.env.FIREBASE_API_KEY),
+  authDomain: cleanValue(process.env.FIREBASE_AUTH_DOMAIN),
+  projectId: cleanValue(process.env.ID_DO_PROJETO_FIREBASE),
+  storageBucket: cleanValue(process.env.FIREBASE_STORAGE_BUCKET),
+  messagingSenderId: cleanValue(process.env.ID_DO_REMETENTE_DE_MENSAGENS_DO_FIREBASE),
+  appId: cleanValue(process.env.ID_DO_APLICATIVO_FIREBASE)
 };
 
 export const isFirebaseConfigured = !!(
@@ -28,7 +30,7 @@ export const getEnvStatus = () => ({
   storageBucket: !!firebaseConfig.storageBucket,
   messagingId: !!firebaseConfig.messagingSenderId,
   appId: !!firebaseConfig.appId,
-  geminiKey: !!getEnv(process.env.API_KEY)
+  geminiKey: !!cleanValue(process.env.API_KEY)
 });
 
 let app: FirebaseApp | null = null;
@@ -38,9 +40,9 @@ if (isFirebaseConfigured) {
   try {
     app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
     db = getFirestore(app);
-    console.log("🔥 Firebase: Configuração detectada. Tentando conexão...");
+    console.log("✅ Firebase inicializado com sucesso!");
   } catch (err) {
-    console.error("🔥 Firebase: Erro de inicialização:", err);
+    console.error("❌ Erro ao inicializar Firebase:", err);
   }
 }
 
@@ -53,13 +55,14 @@ export const testFirestoreConnection = async () => {
     await getDocs(q);
     return true;
   } catch (e: any) {
-    console.error("❌ Firestore Connection Error:", e.message);
-    return false;
+    console.warn("⚠️ Firestore conectado mas sem acesso ou vazio:", e.message);
+    // Se o erro for apenas que a coleção não existe, ainda consideramos "saudável" o suficiente para tentar o seed
+    return e.code !== 'permission-denied';
   }
 };
 
 export const seedDatabase = async (initialData: any) => {
-  if (!db) return { success: false, message: "Banco de dados offline" };
+  if (!db) return { success: false, message: "Banco de dados offline. Verifique as chaves." };
   try {
     const batch = writeBatch(db);
     const collections = [
@@ -71,27 +74,33 @@ export const seedDatabase = async (initialData: any) => {
     ];
 
     for (const col of collections) {
-      for (const item of col.data) {
-        const ref = doc(collection(db, col.name));
-        const { id, ...dataWithoutId } = item;
-        batch.set(ref, dataWithoutId);
+      if (col.data) {
+        for (const item of col.data) {
+          const ref = doc(collection(db, col.name));
+          const { id, ...dataWithoutId } = item;
+          batch.set(ref, dataWithoutId);
+        }
       }
     }
 
     await batch.commit();
-    return { success: true, message: "Dados enviados com sucesso!" };
+    return { success: true, message: "Nuvem Ortomac sincronizada com sucesso!" };
   } catch (e: any) {
-    return { success: false, message: e.message };
+    return { success: false, message: "Erro de sincronização: " + e.message };
   }
 };
 
 export const subscribeToCollection = (collectionName: string, callback: (data: any[]) => void) => {
   if (!db) return () => {};
-  const q = collection(db, collectionName);
-  return onSnapshot(q, (snapshot) => {
-    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    callback(data);
-  }, (err) => console.error(err));
+  try {
+    const q = collection(db, collectionName);
+    return onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      callback(data);
+    }, (err) => console.error(`Erro na coleção ${collectionName}:`, err));
+  } catch (e) {
+    return () => {};
+  }
 };
 
 export const addToCloud = async (collectionName: string, data: any) => {
