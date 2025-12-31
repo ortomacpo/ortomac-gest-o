@@ -119,7 +119,7 @@ const App: React.FC = () => {
       isSynced={firestoreHealthy}
     >
       <div className="relative">
-        {(showDiagnostic) && (
+        {showDiagnostic && (
           <div className="mb-6 p-6 rounded-3xl bg-white border border-blue-100 shadow-xl animate-in slide-in-from-top duration-500">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="flex items-center space-x-4">
@@ -150,7 +150,7 @@ const App: React.FC = () => {
               <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl text-[10px] text-amber-800 leading-relaxed">
                 <p><strong>⚠️ Atenção:</strong> O sistema está operando em <strong>Modo Local</strong>. Para ativar a nuvem:</p>
                 <ol className="list-decimal ml-4 mt-1 space-y-1">
-                  <li>Certifique-se que adicionou as chaves no painel <strong>Settings &rarr; Environment Variables</strong> da Vercel.</li>
+                  <li>Certifique-se que adicionou as chaves no painel <strong>Settings {'->'} Environment Variables</strong> da Vercel.</li>
                   <li>Os nomes devem ser exatamente: <code>FIREBASE_API_KEY</code>, <code>ID_DO_PROJETO_FIREBASE</code>, etc.</li>
                   <li>Após salvar, você PRECISA fazer um <strong>Redeploy</strong> na Vercel para as chaves entrarem no código.</li>
                 </ol>
