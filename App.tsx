@@ -85,6 +85,15 @@ const App: React.FC = () => {
     localStorage.removeItem('ortomac_user');
   };
 
+  // Helper local para garantir que a atualização de estoque funcione
+  async function adjustInventoryInCloud(id: string, data: any) {
+    if (isFirebaseConfigured && firestoreHealthy) {
+      await updateInCloud('inventory', id, data);
+    } else {
+      setInventory(prev => prev.map(item => item.id === id ? { ...item, ...data } : item));
+    }
+  }
+
   if (!currentUser) return <Login onLogin={handleLogin} />;
 
   if (loading) {
@@ -124,7 +133,7 @@ const App: React.FC = () => {
               <div className="flex flex-wrap gap-2">
                 <div className="bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-100 flex items-center space-x-2">
                   <span className="text-[10px] font-bold text-gray-400">FIRESTORE:</span>
-                  <span className={`text-[10px] font-black ${firestoreHealthy ? 'text-green-600' : 'text-red-500'}`}>{firestoreHealthy ? 'ONLINE ✅' : 'OFFLINE ❌'}</span>
+                  <span className={`text-[10px] font-black ${firestoreHealthy ? 'text-green-600' : 'text-red-500'}`}>{firestoreHealthy ? 'ONLINE' : 'OFFLINE'}</span>
                 </div>
                 {firebaseWorking && (
                   <button 
@@ -141,9 +150,9 @@ const App: React.FC = () => {
               <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl text-[10px] text-amber-800 leading-relaxed">
                 <p><strong>⚠️ Atenção:</strong> O sistema está operando em <strong>Modo Local</strong>. Para ativar a nuvem:</p>
                 <ol className="list-decimal ml-4 mt-1 space-y-1">
-                  <li>Certifique-se que adicionou as chaves no painel <strong>Settings -> Environment Variables</strong> da Vercel.</li>
+                  <li>Certifique-se que adicionou as chaves no painel <strong>Settings &rarr; Environment Variables</strong> da Vercel.</li>
                   <li>Os nomes devem ser exatamente: <code>FIREBASE_API_KEY</code>, <code>ID_DO_PROJETO_FIREBASE</code>, etc.</li>
-                  <li>Após salvar, você PRECISA fazer um <strong>Redeploy</strong> na Vercel para as chaves "entrarem" no código.</li>
+                  <li>Após salvar, você PRECISA fazer um <strong>Redeploy</strong> na Vercel para as chaves entrarem no código.</li>
                 </ol>
               </div>
             )}
@@ -168,15 +177,6 @@ const App: React.FC = () => {
       </div>
     </Layout>
   );
-
-  // Helper local para garantir que a atualização de estoque funcione
-  async function adjustInventoryInCloud(id: string, data: any) {
-    if (firebaseWorking) {
-      await updateInCloud('inventory', id, data);
-    } else {
-      setInventory(prev => prev.map(item => item.id === id ? { ...item, ...data } : item));
-    }
-  }
 };
 
 export default App;
