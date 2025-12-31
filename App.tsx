@@ -33,7 +33,7 @@ const App: React.FC = () => {
         subscribeToCollection('inventory', (data) => setInventory(data as InventoryItem[])),
         subscribeToCollection('workshopOrders', (data) => setWorkshopOrders(data as WorkshopOrder[]))
       ];
-      const timeout = setTimeout(() => setLoading(false), 3000);
+      const timeout = setTimeout(() => setLoading(false), 5000);
       return () => { unsubs.forEach(unsub => unsub()); clearTimeout(timeout); };
     } else {
       setLoading(false);
@@ -48,6 +48,26 @@ const App: React.FC = () => {
   const handleLogout = () => {
     setCurrentUser(null);
     localStorage.removeItem('ortomac_user');
+  };
+
+  const checkKeys = () => {
+    // Lista baseada exatamente na sua imagem da Vercel
+    const keys = [
+      'API_KEY',
+      'FIREBASE_API_KEY',
+      'FIREBASE_AUTH_DOMAIN',
+      'ID_DO_PROJETO_FIREBASE',
+      'FIREBASE_STORAGE_BUCKET',
+      'ID_DO_REMETENTE_DE_MENSAGENS_DO_FIREBASE',
+      'ID_DO_APLICATIVO_FIREBASE'
+    ];
+    let diagnostic = "Status das Variáveis na Vercel:\n\n";
+    keys.forEach(k => {
+      const val = process.env[k];
+      diagnostic += `${k}: ${val ? "✅ OK" : "❌ NÃO DETECTADA"}\n`;
+    });
+    diagnostic += "\nSe houver '❌', o Redeploy pode ter falhado ou o nome está diferente na Vercel.";
+    alert(diagnostic);
   };
 
   if (!currentUser) return <Login onLogin={handleLogin} />;
@@ -71,13 +91,16 @@ const App: React.FC = () => {
     >
       <div className="relative">
         {!isFirebaseConfigured && (
-          <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[9999] bg-red-600 text-white px-6 py-2 rounded-full shadow-2xl flex items-center space-x-4 border-2 border-white">
-            <span className="font-black text-[10px] uppercase">🚨 Modo Offline</span>
+          <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[9999] bg-red-600 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center space-x-4 border-2 border-white animate-bounce">
+            <div className="flex flex-col">
+              <span className="font-black text-xs uppercase">🚨 Chaves Não Reconhecidas</span>
+              <span className="text-[10px] opacity-80 text-white">Clique no botão ao lado para ajuda</span>
+            </div>
             <button 
-              onClick={() => alert("As chaves do Firebase não foram detectadas. Certifique-se de que adicionou VITE_FIREBASE_API_KEY, VITE_FIREBASE_PROJECT_ID, etc, nas Environment Variables da Vercel e fez um novo Deploy.")}
-              className="bg-white text-red-600 text-[10px] px-2 py-0.5 rounded font-bold"
+              onClick={checkKeys}
+              className="bg-white text-red-600 text-[10px] px-3 py-1.5 rounded-xl font-black hover:bg-gray-100 uppercase"
             >
-              Como resolver?
+              Diagnóstico
             </button>
           </div>
         )}
