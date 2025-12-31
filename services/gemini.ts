@@ -1,10 +1,8 @@
-
 import { GoogleGenAI } from "@google/genai";
 
-// Initialize with direct access to process.env.API_KEY as per guidelines
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
 
-export const getClinicalInsight = async (patientData: string) => {
+export const getClinicalInsight = async (patientData: string): Promise<string> => {
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
@@ -13,10 +11,9 @@ export const getClinicalInsight = async (patientData: string) => {
         systemInstruction: "Você é um consultor técnico sênior da Ortomac Órteses e Próteses. Seja conciso e profissional em português brasileiro.",
       }
     });
-    // Use the .text property directly as per guidelines
-    return response.text;
+    return response.text || "A IA não retornou uma análise clara para este caso.";
   } catch (error) {
     console.error("Gemini Error:", error);
-    return "Não foi possível gerar sugestões clínicas no momento.";
+    return "Não foi possível gerar sugestões clínicas no momento devido a um erro de conexão.";
   }
 };

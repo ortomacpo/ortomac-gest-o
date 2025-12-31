@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Patient } from '../types';
 import { getClinicalInsight } from '../services/gemini';
@@ -34,14 +33,18 @@ const Prontuarios: React.FC<ProntuariosProps> = ({ patients, onAddPatient }) => 
 
   const handleGenerateInsight = async (obs: string) => {
     setLoadingInsight(true);
-    const result = await getClinicalInsight(obs);
-    setInsight(result);
-    setLoadingInsight(false);
+    try {
+      const result = await getClinicalInsight(obs);
+      setInsight(result);
+    } catch (err) {
+      setInsight("Erro ao processar análise.");
+    } finally {
+      setLoadingInsight(false);
+    }
   };
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      {/* Sidebar de Lista de Pacientes */}
       <div className="md:col-span-1 space-y-4">
         <div className="flex flex-col space-y-2">
           <button
@@ -84,7 +87,6 @@ const Prontuarios: React.FC<ProntuariosProps> = ({ patients, onAddPatient }) => 
         </div>
       </div>
 
-      {/* Detalhes do Prontuário */}
       <div className="md:col-span-2">
         {selectedPatient ? (
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-6">
@@ -132,7 +134,6 @@ const Prontuarios: React.FC<ProntuariosProps> = ({ patients, onAddPatient }) => 
         )}
       </div>
 
-      {/* Modal Novo Paciente */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl w-full max-w-lg p-6 shadow-2xl">
