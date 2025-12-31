@@ -10,15 +10,21 @@ const firebaseConfig = {
   appId: process.env.ID_DO_APLICATIVO_FIREBASE
 };
 
+// Log de depuração para o console do navegador (F12)
+console.log("🛠️ Verificando Configuração Firebase...");
+console.log("ID do Projeto:", firebaseConfig.projectId === "undefined" ? "❌ NÃO DEFINIDO" : "✅ " + firebaseConfig.projectId);
+console.log("API Key:", !!firebaseConfig.apiKey && firebaseConfig.apiKey !== "undefined" ? "✅ PRESENTE" : "❌ AUSENTE");
+
 export const isFirebaseConfigured = !!(
   firebaseConfig.apiKey && 
+  firebaseConfig.apiKey !== "undefined" &&
   firebaseConfig.projectId && 
   firebaseConfig.projectId !== "undefined"
 );
 
 export const getEnvStatus = () => ({
   apiKey: !!firebaseConfig.apiKey && firebaseConfig.apiKey !== "undefined",
-  projectId: firebaseConfig.projectId === "undefined" ? null : firebaseConfig.projectId,
+  projectId: firebaseConfig.projectId === "undefined" || !firebaseConfig.projectId ? null : firebaseConfig.projectId,
   appId: !!firebaseConfig.appId && firebaseConfig.appId !== "undefined",
   geminiKey: !!process.env.API_KEY && process.env.API_KEY !== "undefined"
 });
@@ -30,48 +36,67 @@ if (isFirebaseConfigured) {
   try {
     app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
     db = getFirestore(app);
+    console.log("🔥 Firebase Inicializado com Sucesso!");
   } catch (err) {
-    console.error("🔥 Erro Firebase:", err);
+    console.error("🔥 Erro Crítico ao inicializar Firebase:", err);
   }
+} else {
+  console.warn("⚠️ Firebase NÃO está configurado. Rodando em Modo Local.");
 }
 
 export { db };
 
 export const testFirestoreConnection = async () => {
-  if (!db) return false;
+  if (!db) {
+    console.error("❌ Teste de Conexão: DB não inicializado.");
+    return false;
+  }
   try {
+    console.log("🛰️ Testando comunicação com Firestore...");
+    // Tenta uma operação simples de leitura
     const q = query(collection(db, 'patients'), limit(1));
     await getDocs(q);
+    console.log("✅ Conexão com Firestore está SAUDÁVEL.");
     return true;
-  } catch (e) {
+  } catch (e: any) {
+    console.error("❌ Falha na comunicação com Firestore:", e.message);
+    // Se o erro for "Permission Denied", as chaves estão certas mas as regras do Firebase estão fechadas
+    if (e.message.includes("permission-denied")) {
+      console.warn("🚨 DICA: Verifique as REGRAS DE SEGURANÇA (Security Rules) no console do Firebase. Devem estar em modo de teste ou abertas para leitura/escrita.");
+    }
     return false;
   }
 };
 
 export const seedDatabase = async (initialData: any) => {
-  if (!db) return { success: false, message: "Firebase não configurado" };
+  if (!db) return { success: false, message: "Firebase não configurado ou DB offline" };
   try {
-    // Verifica se já existem pacientes para evitar duplicidade acidental
-    const snapshot = await getDocs(query(collection(db, 'patients'), limit(1)));
-    if (!snapshot.empty) return { success: false, message: "O banco já contém dados." };
-
     const batch = writeBatch(db);
     
     // Popular coleções básicas
-    for (const p of initialData.patients) {
-      const ref = doc(collection(db, 'patients'));
-      batch.set(ref, p);
-    }
-    
-    for (const i of initialData.inventory) {
-      const ref = doc(collection(db, 'inventory'));
-      batch.set(ref, i);
+    const collections = [
+      { name: 'patients', data: initialData.patients },
+      { name: 'inventory', data: initialData.inventory },
+      { name: 'appointments', data: initialData.appointments },
+      { name: 'transactions', data: initialData.transactions },
+      { name: 'workshopOrders', data: initialData.workshopOrders }
+    ];
+
+    for (const col of collections) {
+      if (col.data && col.data.length > 0) {
+        for (const item of col.data) {
+          const ref = doc(collection(db, col.name));
+          const { id, ...dataWithoutId } = item;
+          batch.set(ref, dataWithoutId);
+        }
+      }
     }
 
     await batch.commit();
-    return { success: true, message: "Dados sincronizados com sucesso!" };
+    return { success: true, message: "Banco de dados inicializado com sucesso na Nuvem!" };
   } catch (e: any) {
-    return { success: false, message: e.message };
+    console.error("Erro ao popular banco:", e);
+    return { success: false, message: "Erro ao sincronizar: " + e.message };
   }
 };
 
@@ -83,7 +108,7 @@ export const subscribeToCollection = (collectionName: string, callback: (data: a
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       callback(data);
     }, (err) => {
-      console.error(`❌ Erro ${collectionName}:`, err.message);
+      console.error(`❌ Erro em tempo real na coleção ${collectionName}:`, err.message);
     });
   } catch (e) {
     return () => {};
