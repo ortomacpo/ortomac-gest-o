@@ -21,7 +21,8 @@ export const INITIAL_INVENTORY: InventoryItem[] = [
 ];
 
 export const INITIAL_WORKSHOP: WorkshopOrder[] = [
-  { id: 'w1', patientName: 'Carlos Silva', productType: 'Prótese Transtibial', status: 'PRODUCAO', deadline: '2024-06-15', technician: 'João Técnico', description: 'Encaixe em polipropileno' }
+  // Fix: Added the required 'progress' property
+  { id: 'w1', patientName: 'Carlos Silva', productType: 'Prótese Transtibial', status: 'PRODUCAO', deadline: '2024-06-15', technician: 'João Técnico', description: 'Encaixe em polipropileno', progress: 25 }
 ];
 
 export const INITIAL_APPOINTMENTS: Appointment[] = [

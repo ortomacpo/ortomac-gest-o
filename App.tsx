@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { User, Patient, Appointment, Transaction, InventoryItem, WorkshopOrder } from './types';
 import { MOCK_USERS, INITIAL_PATIENTS, INITIAL_APPOINTMENTS, INITIAL_FINANCE, INITIAL_INVENTORY, INITIAL_WORKSHOP } from './constants';
@@ -16,7 +15,6 @@ const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   
-  // Inicializa com dados locais para garantir que o preview nunca fique vazio
   const [patients, setPatients] = useState<Patient[]>(INITIAL_PATIENTS);
   const [appointments, setAppointments] = useState<Appointment[]>(INITIAL_APPOINTMENTS);
   const [transactions, setTransactions] = useState<Transaction[]>(INITIAL_FINANCE);
@@ -29,12 +27,14 @@ const App: React.FC = () => {
     if (savedUser) setCurrentUser(JSON.parse(savedUser));
 
     if (isFirebaseConfigured) {
-      // Se houver Firebase, os dados locais serão substituídos pelos da nuvem
-      const unsubPatients = subscribeToCollection('patients', (data) => data.length > 0 && setPatients(data as Patient[]));
-      const unsubAppointments = subscribeToCollection('appointments', (data) => data.length > 0 && setAppointments(data as Appointment[]));
-      const unsubTransactions = subscribeToCollection('transactions', (data) => data.length > 0 && setTransactions(data as Transaction[]));
-      const unsubInventory = subscribeToCollection('inventory', (data) => data.length > 0 && setInventory(data as InventoryItem[]));
-      const unsubWorkshop = subscribeToCollection('workshopOrders', (data) => data.length > 0 && setWorkshopOrders(data as WorkshopOrder[]));
+      console.log("Conectando aos serviços de nuvem Ortomac...");
+      
+      // Sincronização direta sem travas de tamanho de array
+      const unsubPatients = subscribeToCollection('patients', (data) => setPatients(data as Patient[]));
+      const unsubAppointments = subscribeToCollection('appointments', (data) => setAppointments(data as Appointment[]));
+      const unsubTransactions = subscribeToCollection('transactions', (data) => setTransactions(data as Transaction[]));
+      const unsubInventory = subscribeToCollection('inventory', (data) => setInventory(data as InventoryItem[]));
+      const unsubWorkshop = subscribeToCollection('workshopOrders', (data) => setWorkshopOrders(data as WorkshopOrder[]));
 
       setLoading(false);
       return () => {
@@ -45,7 +45,7 @@ const App: React.FC = () => {
         unsubWorkshop();
       };
     } else {
-      // Se não houver Firebase, apenas remove o loading e usa os dados constantes
+      console.warn("Firebase não configurado. Usando dados locais de demonstração.");
       setLoading(false);
     }
   }, []);
@@ -69,7 +69,7 @@ const App: React.FC = () => {
       <div className="h-screen w-screen flex items-center justify-center bg-blue-900 text-white">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-          <p>Carregando Ortomac...</p>
+          <p className="font-bold tracking-widest uppercase text-sm">Sincronizando Nuvem...</p>
         </div>
       </div>
     );
@@ -121,7 +121,14 @@ const App: React.FC = () => {
       activeTab={activeTab}
       setActiveTab={setActiveTab}
     >
-      {renderContent()}
+      <div className="relative">
+        {!isFirebaseConfigured && (
+          <div className="mb-4 p-2 bg-yellow-100 text-yellow-800 text-[10px] font-bold uppercase text-center rounded-lg border border-yellow-200">
+            ⚠️ Modo Demonstração: Os dados não serão salvos permanentemente. Configure o Firebase na Vercel.
+          </div>
+        )}
+        {renderContent()}
+      </div>
     </Layout>
   );
 };

@@ -1,4 +1,3 @@
-
 export type UserRole = 'GESTOR' | 'FISIOTERAPEUTA' | 'RECEPCIONISTA' | 'TECNICO_ORTOPEDICO';
 
 export interface User {
@@ -15,6 +14,9 @@ export interface Patient {
   email: string;
   cpf: string;
   observations: string;
+  painLevel?: number;
+  lastVisit?: string;
+  treatmentArea?: string;
 }
 
 export interface Appointment {
@@ -53,6 +55,7 @@ export interface WorkshopOrder {
   deadline: string;
   technician: string;
   description: string;
+  progress: number; // 0 a 100
 }
 
 export interface AppState {

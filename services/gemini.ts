@@ -1,6 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
+// Always use the process.env.API_KEY directly for client initialization
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const getClinicalInsight = async (patientData: string): Promise<string> => {
   try {
@@ -11,6 +12,7 @@ export const getClinicalInsight = async (patientData: string): Promise<string> =
         systemInstruction: "Você é um consultor técnico sênior da Ortomac Órteses e Próteses. Seja conciso e profissional em português brasileiro.",
       }
     });
+    // Correctly extract the text content from the GenerateContentResponse object
     return response.text || "A IA não retornou uma análise clara para este caso.";
   } catch (error) {
     console.error("Gemini Error:", error);
