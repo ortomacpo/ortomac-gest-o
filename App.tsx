@@ -9,35 +9,51 @@ import Prontuarios from './views/Prontuarios';
 import Financeiro from './views/Financeiro';
 import Estoque from './views/Estoque';
 import Oficina from './views/Oficina';
-import { subscribeToCollection, addToCloud, updateInCloud, isFirebaseConfigured, db } from './services/firebase';
+import { subscribeToCollection, addToCloud, updateInCloud, isFirebaseConfigured, getEnvStatus, db, testFirestoreConnection } from './services/firebase';
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [patients, setPatients] = useState<Patient[]>(isFirebaseConfigured ? [] : INITIAL_PATIENTS);
-  const [appointments, setAppointments] = useState<Appointment[]>(isFirebaseConfigured ? [] : INITIAL_APPOINTMENTS);
-  const [transactions, setTransactions] = useState<Transaction[]>(isFirebaseConfigured ? [] : INITIAL_FINANCE);
-  const [inventory, setInventory] = useState<InventoryItem[]>(isFirebaseConfigured ? [] : INITIAL_INVENTORY);
-  const [workshopOrders, setWorkshopOrders] = useState<WorkshopOrder[]>(isFirebaseConfigured ? [] : INITIAL_WORKSHOP);
-  const [loading, setLoading] = useState(isFirebaseConfigured);
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [workshopOrders, setWorkshopOrders] = useState<WorkshopOrder[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showDiagnostic, setShowDiagnostic] = useState(false);
+  const [firestoreHealthy, setFirestoreHealthy] = useState<boolean | null>(null);
 
   useEffect(() => {
     const savedUser = localStorage.getItem('ortomac_user');
     if (savedUser) setCurrentUser(JSON.parse(savedUser));
 
-    if (isFirebaseConfigured && db) {
-      const unsubs = [
-        subscribeToCollection('patients', (data) => { setPatients(data as Patient[]); setLoading(false); }),
-        subscribeToCollection('appointments', (data) => setAppointments(data as Appointment[])),
-        subscribeToCollection('transactions', (data) => setTransactions(data as Transaction[])),
-        subscribeToCollection('inventory', (data) => setInventory(data as InventoryItem[])),
-        subscribeToCollection('workshopOrders', (data) => setWorkshopOrders(data as WorkshopOrder[]))
-      ];
-      const timeout = setTimeout(() => setLoading(false), 5000);
-      return () => { unsubs.forEach(unsub => unsub()); clearTimeout(timeout); };
-    } else {
-      setLoading(false);
-    }
+    const initData = async () => {
+      if (isFirebaseConfigured && db) {
+        // Testa a conexão real com o banco
+        const healthy = await testFirestoreConnection();
+        setFirestoreHealthy(healthy);
+
+        const unsubs = [
+          subscribeToCollection('patients', (data) => setPatients(data as Patient[])),
+          subscribeToCollection('appointments', (data) => setAppointments(data as Appointment[])),
+          subscribeToCollection('transactions', (data) => setTransactions(data as Transaction[])),
+          subscribeToCollection('inventory', (data) => setInventory(data as InventoryItem[])),
+          subscribeToCollection('workshopOrders', (data) => setWorkshopOrders(data as WorkshopOrder[]))
+        ];
+        
+        setTimeout(() => setLoading(false), 1000);
+        return () => unsubs.forEach(unsub => unsub());
+      } else {
+        setPatients(INITIAL_PATIENTS);
+        setAppointments(INITIAL_APPOINTMENTS);
+        setTransactions(INITIAL_FINANCE);
+        setInventory(INITIAL_INVENTORY);
+        setWorkshopOrders(INITIAL_WORKSHOP);
+        setLoading(false);
+      }
+    };
+
+    initData();
   }, []);
 
   const handleLogin = (user: User) => {
@@ -50,36 +66,19 @@ const App: React.FC = () => {
     localStorage.removeItem('ortomac_user');
   };
 
-  const checkKeys = () => {
-    // Lista baseada exatamente na sua imagem da Vercel
-    const keys = [
-      'API_KEY',
-      'FIREBASE_API_KEY',
-      'FIREBASE_AUTH_DOMAIN',
-      'ID_DO_PROJETO_FIREBASE',
-      'FIREBASE_STORAGE_BUCKET',
-      'ID_DO_REMETENTE_DE_MENSAGENS_DO_FIREBASE',
-      'ID_DO_APLICATIVO_FIREBASE'
-    ];
-    let diagnostic = "Status das Variáveis na Vercel:\n\n";
-    keys.forEach(k => {
-      const val = process.env[k];
-      diagnostic += `${k}: ${val ? "✅ OK" : "❌ NÃO DETECTADA"}\n`;
-    });
-    diagnostic += "\nSe houver '❌', o Redeploy pode ter falhado ou o nome está diferente na Vercel.";
-    alert(diagnostic);
-  };
-
   if (!currentUser) return <Login onLogin={handleLogin} />;
 
   if (loading) {
     return (
       <div className="h-screen w-screen flex flex-col items-center justify-center bg-blue-900 text-white">
         <div className="w-16 h-16 border-4 border-white/20 border-t-white rounded-full animate-spin mb-4"></div>
-        <p className="font-bold tracking-widest animate-pulse uppercase text-sm">Conectando à Nuvem...</p>
+        <h2 className="text-xl font-bold animate-pulse tracking-widest">ORTOMAC</h2>
+        <p className="text-xs text-blue-300 mt-2">Sincronizando Nuvem Ortomac-1...</p>
       </div>
     );
   }
+
+  const env = getEnvStatus();
 
   return (
     <Layout
@@ -90,19 +89,40 @@ const App: React.FC = () => {
       setActiveTab={setActiveTab}
     >
       <div className="relative">
-        {!isFirebaseConfigured && (
-          <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[9999] bg-red-600 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center space-x-4 border-2 border-white animate-bounce">
-            <div className="flex flex-col">
-              <span className="font-black text-xs uppercase">🚨 Chaves Não Reconhecidas</span>
-              <span className="text-[10px] opacity-80 text-white">Clique no botão ao lado para ajuda</span>
+        {(!isFirebaseConfigured || showDiagnostic) && (
+          <div className={`mb-6 p-5 rounded-3xl flex items-center justify-between border-2 ${!isFirebaseConfigured || firestoreHealthy === false ? 'bg-red-50 border-red-200' : 'bg-blue-50 border-blue-200'}`}>
+            <div className="flex items-center space-x-4">
+              <span className="text-3xl">{!isFirebaseConfigured ? '⚠️' : firestoreHealthy ? '✅' : '❌'}</span>
+              <div>
+                <p className={`font-black text-sm uppercase ${!isFirebaseConfigured ? 'text-red-800' : 'text-blue-800'}`}>
+                  {!isFirebaseConfigured ? 'Firebase: Não Configurado' : `Firestore: ${firestoreHealthy ? 'Conectado' : 'Erro de Permissão'}`}
+                </p>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1">
+                  <span className={`text-[10px] font-bold ${env.projectId ? 'text-green-600' : 'text-red-400'}`}>ID PROJETO: {env.projectId ? 'OK' : 'FALTA'}</span>
+                  <span className={`text-[10px] font-bold ${firestoreHealthy ? 'text-green-600' : 'text-red-400'}`}>BANCO DADOS: {firestoreHealthy ? 'ATIVO' : 'BLOQUEADO'}</span>
+                  <span className={`text-[10px] font-bold ${env.geminiKey ? 'text-green-600' : 'text-red-400'}`}>IA GEMINI: {env.geminiKey ? 'ATIVO' : 'FALTA'}</span>
+                </div>
+              </div>
             </div>
-            <button 
-              onClick={checkKeys}
-              className="bg-white text-red-600 text-[10px] px-3 py-1.5 rounded-xl font-black hover:bg-gray-100 uppercase"
-            >
-              Diagnóstico
-            </button>
+            {!isFirebaseConfigured && (
+              <button 
+                onClick={() => window.open('https://vercel.com', '_blank')}
+                className="bg-red-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-red-700 transition-all shadow-lg shadow-red-100"
+              >
+                Abrir Vercel
+              </button>
+            )}
           </div>
+        )}
+
+        {currentUser.role === 'GESTOR' && (
+          <button 
+            onClick={() => setShowDiagnostic(!showDiagnostic)}
+            className="fixed bottom-20 right-6 w-12 h-12 bg-white shadow-2xl rounded-full flex items-center justify-center border border-gray-100 z-[100] hover:scale-110 active:scale-90 transition-all"
+            title="Diagnóstico de Sistema"
+          >
+            ⚙️
+          </button>
         )}
         
         {activeTab === 'dashboard' && <Dashboard patients={patients} appointments={appointments} transactions={transactions} inventory={inventory} workshopOrders={workshopOrders} />}
